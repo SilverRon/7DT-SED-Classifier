@@ -1,0 +1,4 @@
+type	event	model	version	peakBmaglo	peakBmagup
+Ia	Model	hsiao	3.0	-18	-20
+Ibc	Model	nugent-sn1bc	1.1	-15	-20
+II	2013fs	v19-2013fs-corr	1.0	-14	-19
