@@ -637,6 +637,33 @@ def prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase,
 	y = np.array(y)
 	return X, y
 
+def tablize_sedinfo(path_sedinfo, models):
+	infotbl = Table()
+	infotbl['model'] = models
+	
+	with open(path_sedinfo, 'r') as f:
+		for line in f:
+			#	Find parameter row
+			if line.startswith('PARNAMES: '):
+				# print(line)
+				headers = line.split()[1:]
+				break
+		#	Generate empty columns
+		for header in headers:
+			infotbl[header] = 0.0
+
+		for ll, line in enumerate(f):
+			if ll < len(infotbl):
+				#	Values
+				if line.startswith('SED:'):
+					vals = line.split()[2:]
+					for hh, header in enumerate(headers):
+						infotbl[header][ll] = float(vals[hh])
+
+	return infotbl
+
+
+
 #==========
 
 filterlist_med25nm = (

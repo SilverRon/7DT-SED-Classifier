@@ -13,33 +13,6 @@ import matplotlib.pyplot as plt
 from astropy.time import Time
 
 # %%
-def tablize_sedinfo(path_sedinfo, models):
-	infotbl = Table()
-	infotbl['model'] = models
-	
-	with open(path_sedinfo, 'r') as f:
-		for line in f:
-			#	Find parameter row
-			if line.startswith('PARNAMES: '):
-				# print(line)
-				headers = line.split()[1:]
-				break
-		#	Generate empty columns
-		for header in headers:
-			infotbl[header] = 0.0
-
-		for ll, line in enumerate(f):
-			if ll < len(infotbl):
-				#	Values
-				if line.startswith('SED:'):
-					vals = line.split()[2:]
-					for hh, header in enumerate(headers):
-						infotbl[header][ll] = float(vals[hh])
-
-	return infotbl
-
-
-# %%
 snrcut = 3
 source = 'MOSFiT'
 fittype = 'SNIax'
@@ -149,275 +122,276 @@ print(f"lamstep: {lamstep:g} AA")
 print(f"n_lam: {len(lamarr)}")
 
 # %%
-if group == 'med25nm':
-	#	Medium-band
-	path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
-else:
-	#	Broad-band
-	path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/broad'
-path_output = f'../fit_result/{intype}2{fittype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
-if not os.path.exists(path_output):
-	os.makedirs(path_output)
-outfits = f"{path_output}/fit_result.fits"
-
-# %%
-intablelist = sorted(glob.glob(f"{path_input}/obs.*.fits"))
-print(f"{len(intablelist)} input tables found")
-
-# %%
-outbl = Table()
-#	Input data
-outbl['input_table'] = [os.path.basename(intable) for intable in intablelist]
-#	Detection / Fit
-outbl['ndet'] = 0
-outbl['det_filters'] = " "*200
-outbl['det'] = False
-outbl['fit'] = False
-#	Fitted Parameters
-outbl['z'] = 0.
-outbl['t'] = 0.
-for key in param_keys:
-	outbl[key] = 0.
-#	Error
-outbl['zerr'] = 0.
-outbl['terr'] = 0.
-for key in param_keys:
-	outbl[f"{key}err"] = 0.
-
-#	Fit Results
-outbl['free_params'] = 0
-outbl['dof'] = 0
-outbl['chisq'] = 0.
-outbl['chisqdof'] = 0.
-outbl['bic'] = 0.
-#	Meta
-outbl.meta['fittype'] = fittype
-outbl.meta['source'] = source
-outbl.meta['intype'] = intype
-outbl.meta['indist[Mpc]'] = indist
-outbl.meta['inexptime[s]'] = inexptime
-outbl.meta['group'] = group
-outbl.meta['date'] = Time.now().isot
-
-# %%
-#	Temp Table
-_mdtbl = Table.read(intablelist[0])
-for key, val in _mdtbl.meta.items():
-	if key in ['MD', 'VD', 'MW', 'VW', 'ANG', 'PHASE', 'REDSHIFT',]:
-		if type(val) is str:
-			outbl[key] = ' '*10
-		elif type(val) is float:
-			outbl[key] = 0.0
-		elif type(val) is int:
-			outbl[key] = 0
-
-# %%
-def func(x, z, t, M_V, t_rise, dm15B, dm15R):
-
-	new_data = np.array(
-		[[M_V, t_rise, dm15B, dm15R, t]]
-		)
-
-	#	Spectrum : wavelength & flux
-	flam = rf.predict(new_data)[0]
-
-	#	Redshifted
-	(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
-	mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
-
-	spmag = np.array([mags[key][0] for key in mags.keys()])
-	spfnu = (spmag*u.ABmag).to(u.uJy).value
-
-	return spfnu
-
-# %%
-ii = 10
-intable = intablelist[ii]
-st = time.time()
-
-# %%
-for ii, intable in enumerate(intablelist):
-	print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
-	intbl = Table.read(intable)
+for inexptime in [60, 180, 300, 600, 900]:
+	if group == 'med25nm':
+		#	Medium-band
+		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
+	else:
+		#	Broad-band
+		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/broad'
+	path_output = f'../fit_result/{intype}2{fittype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
+	if not os.path.exists(path_output):
+		os.makedirs(path_output)
+	outfits = f"{path_output}/fit_result.fits"
 
 	# %%
-	indx_det = np.where(intbl['snr']>snrcut)
-	filterlist_det = list(intbl['filter'][indx_det])
-	filterlist_str = ",".join(filterlist_det)
+	intablelist = sorted(glob.glob(f"{path_input}/obs.*.fits"))
+	print(f"{len(intablelist)} input tables found")
 
 	# %%
-	filterset = [f"{group}-{filte}" for filte, _, group in filterset_group if filte in filterlist_det]
-	bands = speclite.filters.load_filters(*filterset)
+	outbl = Table()
+	#	Input data
+	outbl['input_table'] = [os.path.basename(intable) for intable in intablelist]
+	#	Detection / Fit
+	outbl['ndet'] = 0
+	outbl['det_filters'] = " "*200
+	outbl['det'] = False
+	outbl['fit'] = False
+	#	Fitted Parameters
+	outbl['z'] = 0.
+	outbl['t'] = 0.
+	for key in param_keys:
+		outbl[key] = 0.
+	#	Error
+	outbl['zerr'] = 0.
+	outbl['terr'] = 0.
+	for key in param_keys:
+		outbl[f"{key}err"] = 0.
+
+	#	Fit Results
+	outbl['free_params'] = 0
+	outbl['dof'] = 0
+	outbl['chisq'] = 0.
+	outbl['chisqdof'] = 0.
+	outbl['bic'] = 0.
+	#	Meta
+	outbl.meta['fittype'] = fittype
+	outbl.meta['source'] = source
+	outbl.meta['intype'] = intype
+	outbl.meta['indist[Mpc]'] = indist
+	outbl.meta['inexptime[s]'] = inexptime
+	outbl.meta['group'] = group
+	outbl.meta['date'] = Time.now().isot
 
 	# %%
-	# %%
-	ndet = len(filterset)
-	detection = np.any(intbl['snr'] > 5)
-	if verbose:
-		print(f"number of detections: {ndet}")
-		print(f"detection: {detection}")
+	#	Temp Table
+	_mdtbl = Table.read(intablelist[0])
+	for key, val in _mdtbl.meta.items():
+		if key in ['MD', 'VD', 'MW', 'VW', 'ANG', 'PHASE', 'REDSHIFT',]:
+			if type(val) is str:
+				outbl[key] = ' '*10
+			elif type(val) is float:
+				outbl[key] = 0.0
+			elif type(val) is int:
+				outbl[key] = 0
 
 	# %%
-	xdata = intbl['fnuobs'].data[indx_det]
-	ydata = xdata
-	sigma = intbl['fnuerr'].data[indx_det]
+	def func(x, z, t, M_V, t_rise, dm15B, dm15R):
 
-	# %% [markdown]
-	# - x, z, t, M_V, t_rise, dm15B, dm15R
-
-	# %%
-	if detection:
-		p0 = (
-			0.01, 0, np.mean(infotbl['M_V']), np.mean(infotbl['t_rise']), np.mean(infotbl['dm15B']), np.mean(infotbl['dm15B']),
-		)
-
-		bounds = (
-			(0.0, -np.inf, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
-			(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
-		)
-
-		n_free_param = len(inspect.signature(func).parameters)-1
-
-		# %%
-		fit = False
-		try:
-			popt, pcov = curve_fit(
-				func,
-				xdata=xdata,
-				ydata=ydata,
-				sigma=sigma,
-				# p0=p0,
-				absolute_sigma=True,
-				check_finite=True,
-				bounds=bounds,
-				method='trf',
-				# max_nfev=1e4,
+		new_data = np.array(
+			[[M_V, t_rise, dm15B, dm15R, t]]
 			)
-			fit = True
-		except Exception as e:
-			# print(e)
-			outlog = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'log')}"
-			f = open(outlog, 'w')
-			f.write(str(e))
-			f.close()
-			fit = False
 
+		#	Spectrum : wavelength & flux
+		flam = rf.predict(new_data)[0]
+
+		#	Redshifted
+		(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
+		mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
+
+		spmag = np.array([mags[key][0] for key in mags.keys()])
+		spfnu = (spmag*u.ABmag).to(u.uJy).value
+
+		return spfnu
+
+	# %%
+	ii = 10
+	intable = intablelist[ii]
+	st = time.time()
+
+	# %%
+	for ii, intable in enumerate(intablelist):
+		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
+		intbl = Table.read(intable)
 
 		# %%
-		if fit:
-			#	Fitting result
-			r = ydata.data - func(xdata, *popt)
+		indx_det = np.where(intbl['snr']>snrcut)
+		filterlist_det = list(intbl['filter'][indx_det])
+		filterlist_str = ",".join(filterlist_det)
+
+		# %%
+		filterset = [f"{group}-{filte}" for filte, _, group in filterset_group if filte in filterlist_det]
+		bands = speclite.filters.load_filters(*filterset)
+
+		# %%
+		# %%
+		ndet = len(filterset)
+		detection = np.any(intbl['snr'] > 5)
+		if verbose:
+			print(f"number of detections: {ndet}")
+			print(f"detection: {detection}")
+
+		# %%
+		xdata = intbl['fnuobs'].data[indx_det]
+		ydata = xdata
+		sigma = intbl['fnuerr'].data[indx_det]
+
+		# %% [markdown]
+		# - x, z, t, M_V, t_rise, dm15B, dm15R
+
+		# %%
+		if detection:
+			p0 = (
+				0.01, 0, np.mean(infotbl['M_V']), np.mean(infotbl['t_rise']), np.mean(infotbl['dm15B']), np.mean(infotbl['dm15B']),
+			)
+
+			bounds = (
+				(0.0, -np.inf, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
+				(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
+			)
+
 			n_free_param = len(inspect.signature(func).parameters)-1
-			dof = ndet - n_free_param
-			chisq_i = (r / sigma) ** 2
-			chisq = np.sum(chisq_i)
-			chisqdof = chisq/dof
-			bic = chisq + n_free_param*np.log(ndet)
-			perr = np.sqrt(np.diag(pcov))
 
 			# %%
-			z = popt[0]
-			t = popt[1]
-			M_V = popt[2]
-			t_rise = popt[3]
-			dm15B = popt[4]
-			dm15R = popt[5]
-			if verbose:
-				print(f"z={z:.3}")
-				print(f"t={t:.3}")
-				print(f"M_V={M_V:.3}")
-				print(f"t_rise={t_rise:.3}")
-				print(f"dm15B={dm15B:.3}")
-				print(f"dm15R={dm15R:.3}")
-
-			# %%
-			outpng = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'png')}"
-
-
-			# %%
-			#	Detection / Fit
-			outbl['ndet'][ii] = ndet
-			outbl['det_filters'][ii] = filterlist_str
-			outbl['det'][ii] = detection
-			outbl['fit'][ii] = fit
-			#	Fitted Parameters
-			outbl['z'][ii] = z
-			outbl['t'][ii] = t
-			outbl['M_V'][ii] = M_V
-			outbl['t_rise'][ii] = t_rise
-			outbl['dm15B'][ii] = dm15B
-			outbl['dm15R'][ii] = dm15R
-
-			#	Error
-			outbl['zerr'][ii] = perr[0]
-			outbl['terr'][ii] = perr[1]
-			outbl['M_Verr'][ii] = perr[2]
-			outbl['t_riseerr'][ii] = perr[3]
-			outbl['dm15Berr'][ii] = perr[4]
-			outbl['dm15Rerr'][ii] = perr[5]
-
-			#	Fit Results
-			outbl['free_params'][ii] = n_free_param
-			outbl['dof'][ii] = dof
-			outbl['chisq'][ii] = chisq
-			outbl['chisqdof'][ii] = chisqdof
-			outbl['bic'][ii] = bic
-
-			# %%
-			new_data = np.array(
-				[[M_V, t_rise, dm15B, dm15R, t]]
+			fit = False
+			try:
+				popt, pcov = curve_fit(
+					func,
+					xdata=xdata,
+					ydata=ydata,
+					sigma=sigma,
+					# p0=p0,
+					absolute_sigma=True,
+					check_finite=True,
+					bounds=bounds,
+					method='trf',
+					# max_nfev=1e4,
 				)
+				fit = True
+			except Exception as e:
+				# print(e)
+				outlog = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'log')}"
+				f = open(outlog, 'w')
+				f.write(str(e))
+				f.close()
+				fit = False
 
-			#	Spectrum : wavelength & flux
-			flam = rf.predict(new_data)[0]
-
-			# %%
-			(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
-			mags = bands.get_ab_magnitudes(zspappflam, zsplam)
-
-			spmag = np.array([mags[key][0] for key in mags.keys()])
-			spfnu = (spmag*u.ABmag).to(u.uJy).value
-
-			# %%
-			fnuarr = convert_flam2fnu(zspappflam, zsplam).to(u.uJy)
 
 			# %%
-			label = f"""n_det={ndet}, rchisq={chisqdof:.3f}, bic={bic:.3f}
-			z ={z:.3f}, t ={t:.3f}
-			M_V={M_V:.3f}, t_rise={t_rise:.3f}, dm15B={dm15B:.3f}, dm15R={dm15B:.3f}"""
+			if fit:
+				#	Fitting result
+				r = ydata.data - func(xdata, *popt)
+				n_free_param = len(inspect.signature(func).parameters)-1
+				dof = ndet - n_free_param
+				chisq_i = (r / sigma) ** 2
+				chisq = np.sum(chisq_i)
+				chisqdof = chisq/dof
+				bic = chisq + n_free_param*np.log(ndet)
+				perr = np.sqrt(np.diag(pcov))
 
-			# %%
-			plt.close('all')
-			plt.figure(figsize=(8, 6))
-			plt.plot(lamarr, fnuarr, c='grey', lw=3, alpha=0.5, label=label)
-			yl, yu = plt.ylim()
-			# plt.scatter(bands.effective_wavelengths, xdata, c=intbl['snr'], marker='s', s=50, ec='k')
-			plt.scatter(intbl['lam'], intbl['fnuobs'], c=intbl['snr'], marker='s', s=50, ec='k')
-			if 'med' in group:
-				plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidth/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
-			elif 'broad' in group:
-				# plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad[indx_det]/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
-				plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
-			cbar = plt.colorbar()
-			cbar.set_label("SNR")
-			# plt.plot(bands.effective_wavelengths, func(xdata, *popt), '.', c='tomato')
-			plt.plot(intbl['lam'], intbl['fnu'], c='tomato', marker='.', ls='none', zorder=0)
-			plt.title(f"{fittype} {source.upper()}")
-			plt.xticks(fontsize=12)
-			plt.yticks(fontsize=12)
-			if 'med' in group:
-				xl = 3750
-				xr = 9000
-			else:
-				xl = 3000
-				xr = 10000
-			plt.xlim([xl, xr])
-			plt.ylim([yl, yu])
-			plt.xlabel(r"$\rm \lambda$ [$\AA$]")
-			plt.ylabel(r"$\rm f_\nu$ [uJy]")
-			plt.legend(loc='lower center')
-			plt.tight_layout()
-			plt.savefig(outpng, dpi=100)
+				# %%
+				z = popt[0]
+				t = popt[1]
+				M_V = popt[2]
+				t_rise = popt[3]
+				dm15B = popt[4]
+				dm15R = popt[5]
+				if verbose:
+					print(f"z={z:.3}")
+					print(f"t={t:.3}")
+					print(f"M_V={M_V:.3}")
+					print(f"t_rise={t_rise:.3}")
+					print(f"dm15B={dm15B:.3}")
+					print(f"dm15R={dm15R:.3}")
+
+				# %%
+				outpng = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'png')}"
+
+
+				# %%
+				#	Detection / Fit
+				outbl['ndet'][ii] = ndet
+				outbl['det_filters'][ii] = filterlist_str
+				outbl['det'][ii] = detection
+				outbl['fit'][ii] = fit
+				#	Fitted Parameters
+				outbl['z'][ii] = z
+				outbl['t'][ii] = t
+				outbl['M_V'][ii] = M_V
+				outbl['t_rise'][ii] = t_rise
+				outbl['dm15B'][ii] = dm15B
+				outbl['dm15R'][ii] = dm15R
+
+				#	Error
+				outbl['zerr'][ii] = perr[0]
+				outbl['terr'][ii] = perr[1]
+				outbl['M_Verr'][ii] = perr[2]
+				outbl['t_riseerr'][ii] = perr[3]
+				outbl['dm15Berr'][ii] = perr[4]
+				outbl['dm15Rerr'][ii] = perr[5]
+
+				#	Fit Results
+				outbl['free_params'][ii] = n_free_param
+				outbl['dof'][ii] = dof
+				outbl['chisq'][ii] = chisq
+				outbl['chisqdof'][ii] = chisqdof
+				outbl['bic'][ii] = bic
+
+				# %%
+				new_data = np.array(
+					[[M_V, t_rise, dm15B, dm15R, t]]
+					)
+
+				#	Spectrum : wavelength & flux
+				flam = rf.predict(new_data)[0]
+
+				# %%
+				(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
+				mags = bands.get_ab_magnitudes(zspappflam, zsplam)
+
+				spmag = np.array([mags[key][0] for key in mags.keys()])
+				spfnu = (spmag*u.ABmag).to(u.uJy).value
+
+				# %%
+				fnuarr = convert_flam2fnu(zspappflam, zsplam).to(u.uJy)
+
+				# %%
+				label = f"""n_det={ndet}, rchisq={chisqdof:.3f}, bic={bic:.3f}
+				z ={z:.3f}, t ={t:.3f}
+				M_V={M_V:.3f}, t_rise={t_rise:.3f}, dm15B={dm15B:.3f}, dm15R={dm15B:.3f}"""
+
+				# %%
+				plt.close('all')
+				plt.figure(figsize=(8, 6))
+				plt.plot(lamarr, fnuarr, c='grey', lw=3, alpha=0.5, label=label)
+				yl, yu = plt.ylim()
+				# plt.scatter(bands.effective_wavelengths, xdata, c=intbl['snr'], marker='s', s=50, ec='k')
+				plt.scatter(intbl['lam'], intbl['fnuobs'], c=intbl['snr'], marker='s', s=50, ec='k')
+				if 'med' in group:
+					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidth/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
+				elif 'broad' in group:
+					# plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad[indx_det]/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
+					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
+				cbar = plt.colorbar()
+				cbar.set_label("SNR")
+				# plt.plot(bands.effective_wavelengths, func(xdata, *popt), '.', c='tomato')
+				plt.plot(intbl['lam'], intbl['fnu'], c='tomato', marker='.', ls='none', zorder=0)
+				plt.title(f"{fittype} {source.upper()}")
+				plt.xticks(fontsize=12)
+				plt.yticks(fontsize=12)
+				if 'med' in group:
+					xl = 3750
+					xr = 9000
+				else:
+					xl = 3000
+					xr = 10000
+				plt.xlim([xl, xr])
+				plt.ylim([yl, yu])
+				plt.xlabel(r"$\rm \lambda$ [$\AA$]")
+				plt.ylabel(r"$\rm f_\nu$ [uJy]")
+				plt.legend(loc='lower center')
+				plt.tight_layout()
+				plt.savefig(outpng, dpi=100)
 
 # %%
 ed = time.time()
