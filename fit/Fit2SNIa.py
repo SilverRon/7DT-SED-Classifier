@@ -30,6 +30,38 @@ source = 'salt3'
 fittype = 'SNIa'
 verbose = False
 
+
+# %% [markdown]
+# ## Path
+
+# %%
+intype = 'kn'
+indist = 40
+inexptime = 180
+group = 'broad_ugriz'
+if group == 'med25nm':
+	filterset_group = filterlist_med25nm
+elif group == 'broad_griz':
+	filterset_group = filterlist_griz
+elif group == 'broad_ugriz':
+	filterset_group = filterlist_ugriz
+filterset = [f"{group}-{filte}" for filte, _, group in filterset_group]
+bands = speclite.filters.load_filters(*filterset)
+
+if 'med' in bands.names[0]:
+	#    Medium-band
+	bandwidth = 250 # [AA]
+	lammin = 3000
+	lammax = 10000
+else:
+	#	Broad-band
+	bandwidth = 1000 # [AA]
+	lammin = 2000
+	lammax = 12000
+
+lamstep = bandwidth/10
+
+
 # %%
 model = sncosmo.Model(source)
 model.param_names
@@ -38,7 +70,8 @@ phasemin, phasemax = model.mintime(), model.maxtime()
 phasearr = np.arange(phasemin, phasemax, 1)
 #	wavelength
 lammin, lammax = model.minwave(), model.maxwave()
-lamarr = np.arange(lammin, lammax, 1)
+# lamarr = np.arange(lammin, lammax, 1)
+lamarr = np.arange(lammin, lammax, lamstep)
 
 # %%
 def func(x, z, t, x0, x1, c):
@@ -56,20 +89,28 @@ def func(x, z, t, x0, x1, c):
 
 	return spfnu
 
-# %% [markdown]
-# ## Path
 
-# %%
-intype = 'kn'
-indist = 40
-inexptime = 180
-group = 'med25nm'
+
+
+
+# lamarr = np.arange(lammin, lammax+lamstep, lamstep)
+# _lamarr = np.arange(lammin, lammax+lamstep, 10)
+
+print(f"lam: {lammin:.3f} - {lammax:.3f} AA")
+print(f"lamstep: {lamstep:g} AA")
+print(f"n_lam: {len(lamarr)}")
+
 # for inexptime in [60, 300, 600, 900]:
-# for inexptime in [60, 180, 300, 600, 900]:
-for inexptime in [600, 900]:
+# for inexptime in [600, 900]:
+# %%
+for inexptime in [60, 180, 300, 600, 900]:
 
-	# %%
-	path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
+	if group == 'med25nm':
+		#	Medium-band
+		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
+	else:
+		#	Broad-band
+		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/broad'
 	path_output = f'../fit_result/{intype}2{fittype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
 	if not os.path.exists(path_output):
 		os.makedirs(path_output)
@@ -135,10 +176,12 @@ for inexptime in [600, 900]:
 				outbl[key] = 0
 			# print(key, val)
 
-	# %%
 	ii = 10
+	intable = intablelist[ii]
 	st = time.time()
+	# %%
 	for ii, intable in enumerate(intablelist):
+		# %%
 		# print(f"[{ii:0>6}/{os.path.basename(intable)}]")
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
 		# intable = intablelist[ii]
@@ -150,7 +193,7 @@ for inexptime in [600, 900]:
 		filterlist_str = ",".join(filterlist_det)
 
 		# %%
-		filterset = [f"{group}-{filte}" for filte, _, group in filterlist_med25nm if filte in filterlist_det]
+		filterset = [f"{group}-{filte}" for filte, _, group in filterset_group if filte in filterlist_det]
 		bands = speclite.filters.load_filters(*filterset)
 
 		# %%
@@ -198,9 +241,9 @@ for inexptime in [600, 900]:
 				f.write(str(e))
 				f.close()
 				fit = False
+			# %%
 
 			if fit:
-				# %%
 				# z, t, x0, x1, c
 				z = popt[0]
 				t = popt[1]
@@ -289,7 +332,12 @@ for inexptime in [600, 900]:
 				yl, yu = plt.ylim()
 				# plt.scatter(bands.effective_wavelengths, xdata, c=intbl['snr'], marker='s', s=50, ec='k')
 				plt.scatter(intbl['lam'], intbl['fnuobs'], c=intbl['snr'], marker='s', s=50, ec='k')
-				plt.errorbar(intbl['lam'], intbl['fnuobs'], yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
+				# plt.errorbar(intbl['lam'], intbl['fnuobs'], yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
+				if 'med' in group:
+					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidth/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
+				elif 'broad' in group:
+					# plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad[indx_det]/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
+					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
 				cbar = plt.colorbar()
 				cbar.set_label("SNR")
 				# plt.plot(bands.effective_wavelengths, func(xdata, *popt), '.', c='tomato')
@@ -297,7 +345,13 @@ for inexptime in [600, 900]:
 				plt.title(f"{fittype} {source.upper()}")
 				plt.xticks(fontsize=12)
 				plt.yticks(fontsize=12)
-				plt.xlim([3750, 9000])
+				if 'med' in group:
+					xl = 3750
+					xr = 9000
+				else:
+					xl = 3000
+					xr = 10000
+				plt.xlim([xl, xr])
 				plt.ylim([yl, yu])
 				plt.xlabel(r"$\rm \lambda$ [$\AA$]")
 				plt.ylabel(r"$\rm f_\nu$ [uJy]")
