@@ -29,7 +29,8 @@ register_custom_filters_on_speclite('../util')
 intype = 'kn'
 indist = 40
 inexptime = 180
-group = 'broad_ugriz'
+group = input("""Choose the filterset (med25nm, broad_griz, broad_ugriz):""")
+# group = 'broad_ugriz'
 if group == 'med25nm':
 	filterset_group = filterlist_med25nm
 elif group == 'broad_griz':

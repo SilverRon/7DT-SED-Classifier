@@ -14,6 +14,7 @@ The 7DT telescope in the 20s will be used with 20-40 medium-band filters to obta
 ## Unstructured Data (Use Template fitting)
 - SN Iax (`PlasTiCC`: `MOSFiT`)
 	- ['model', 'Iax_INDEX', 'M_V', 't_rise', 'dm15B', 'dm15R']
+	- M_V: -19~-15
 - SN Ibc (`PlasTiCC`: `MOSFiT`)
 	- ['model', 'IBC_INDEX', 'Mejecta', 'Kinetic_energy', 'F_nickel']
 - SN II (`PlasTiCC`: `MOSFiT`)

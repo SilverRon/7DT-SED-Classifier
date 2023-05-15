@@ -597,7 +597,45 @@ def register_custom_filters_on_speclite(path):
 		)
 	print(f"Use `med25nm`, `med50nm`, `broad` as `group_name`")
 
+def prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase, number_of_unique_wavelength, phase_upper=30., lam_lower=2000., lam_upper=10000.):
+	X = []
+	y = []
 
+	for mm, model in enumerate(infotbl['model'][:]):
+		_mdtbl = Table.read(model)
+
+		indx = np.where(
+			# (_mdtbl['col1'] <= 30) &
+			# (_mdtbl['col2'] >= 2000) &
+			# (_mdtbl['col2'] <= 10000)
+			(_mdtbl['col1'] <= phase_upper) &
+			(_mdtbl['col2'] >= lam_lower) &
+			(_mdtbl['col2'] <= lam_upper)
+		)
+		mdtbl = _mdtbl[indx]
+
+		# param1 = infotbl['M_V'][mm]
+		# param2 = infotbl['t_rise'][mm]
+		# param3 = infotbl['dm15B'][mm]
+		# param4 = infotbl['dm15R'][mm]
+		# param5 = infotbl['phase'][mm]
+
+		param_values = []
+		for key in param_keys:
+			param_values.append(infotbl[key][mm])
+
+		# 해당 모델의 스펙트럼 데이터 추출
+		model_spectrum = mdtbl['col3'].reshape(number_of_unique_phase, number_of_unique_wavelength)
+
+		# 데이터 포인트 생성 및 추가
+		for pp, param5 in enumerate(phasearr):
+			_param_values = param_values.copy()
+			_param_values.append(param5)
+			X.append(_param_values)
+			y.append(model_spectrum[pp])
+	X = np.array(X)
+	y = np.array(y)
+	return X, y
 
 #==========
 

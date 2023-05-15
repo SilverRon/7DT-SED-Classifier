@@ -34,8 +34,9 @@ verbose = False
 intype = 'kn'
 indist = 40
 inexptime = 180
-group = 'med25nm'
-group = 'broad_ugriz'
+group = input("""Choose the filterset (med25nm, broad_griz, broad_ugriz):""")
+# group = 'med25nm'
+# group = 'broad_ugriz'
 if group == 'med25nm':
 	filterset_group = filterlist_med25nm
 elif group == 'broad_griz':
