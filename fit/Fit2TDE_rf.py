@@ -15,7 +15,7 @@ from astropy.time import Time
 # %%
 snrcut = 3
 source = 'MOSFiT'
-fittype = 'SLSN-I'
+fittype = 'TDE'
 verbose = True
 
 # %%
@@ -34,7 +34,8 @@ _mdtbl = Table.read(model)
 indx = np.where(
     (_mdtbl['col1'] <= 30) &
     (_mdtbl['col2'] >= 2000) &
-    (_mdtbl['col2'] <= 10000)
+    (_mdtbl['col2'] <= 11000)
+    # (_mdtbl['col2'] <= 10000)
 )
 
 mdtbl = _mdtbl[indx]

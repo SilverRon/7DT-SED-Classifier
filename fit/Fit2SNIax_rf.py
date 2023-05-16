@@ -34,7 +34,7 @@ _mdtbl = Table.read(model)
 indx = np.where(
     (_mdtbl['col1'] <= 30) &
     (_mdtbl['col2'] >= 2000) &
-    (_mdtbl['col2'] <= 10000)
+    (_mdtbl['col2'] <= 11000)
 )
 
 mdtbl = _mdtbl[indx]
@@ -365,7 +365,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 				# %%
 				(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
-				mags = bands.get_ab_magnitudes(zspappflam, zsplam)
+				mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
+
 
 				spmag = np.array([mags[key][0] for key in mags.keys()])
 				spfnu = (spmag*u.ABmag).to(u.uJy).value
