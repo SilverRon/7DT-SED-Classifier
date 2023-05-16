@@ -158,7 +158,8 @@ verbose = False
 # %% [markdown]
 # ## Input Tables
 # for inexptime in [60, 180, 300, 600, 900]:
-for inexptime in [900]:
+# for inexptime in [900]:
+for inexptime in [60, 180, 300, 600, 900]:
 
 
 	# %%
