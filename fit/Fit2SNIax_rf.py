@@ -51,7 +51,7 @@ param_keys
 
 # %%
 # 데이터 변환
-X, y = prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase, number_of_unique_wavelength, phase_upper=30., lam_lower=2000., lam_upper=10000.)
+X, y = prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase, number_of_unique_wavelength, phase_upper=np.max(phasearr), lam_lower=np.min(lamarr), lam_upper=np.max(lamarr))
 # 데이터 분할
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
