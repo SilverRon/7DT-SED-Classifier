@@ -246,7 +246,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 			)
 
 			bounds = (
-				(0.0, -np.inf, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
+				(0.0, -25, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
 				(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
 			)
 
