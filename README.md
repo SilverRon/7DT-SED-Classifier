@@ -10,11 +10,13 @@ The 7DT telescope in the 20s will be used with 20-40 medium-band filters to obta
 - SN Ia-91bg (`sncosmo`: `nugent-sn91bg`): Use interpolator
 	- ['z', 't0', 'amplitude'] (`sncosmo`) --> use this!
 	- ['model', 'stretch', 'color'] (`PlasTiCC`)
-
-## Unstructured Data (Use Template fitting)
 - SN Iax (`PlasTiCC`: `MOSFiT`)
 	- ['model', 'Iax_INDEX', 'M_V', 't_rise', 'dm15B', 'dm15R']
+	- Read model/PLAsTiCC/SNIax/sn2005hk.source.pickle with `sncosmo`
+		- ['z', 't0', 'amplitude']
 	- M_V: -19~-15
+
+## Unstructured Data (Use Template fitting)
 - SN Ibc (`PlasTiCC`: `MOSFiT`)
 	- ['model', 'IBC_INDEX', 'Mejecta', 'Kinetic_energy', 'F_nickel']
 - SN II (`PlasTiCC`: `MOSFiT`)

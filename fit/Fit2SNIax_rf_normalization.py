@@ -15,8 +15,8 @@ from astropy.time import Time
 # %%
 snrcut = 3
 source = 'MOSFiT'
-fittype = 'SNIbc'
-verbose = False
+fittype = 'SNIax'
+verbose = True
 
 # %%
 models = sorted(glob.glob(f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/*.fits'))
@@ -35,7 +35,6 @@ indx = np.where(
     (_mdtbl['col1'] <= 30) &
     (_mdtbl['col2'] >= 2000) &
     (_mdtbl['col2'] <= 11000)
-    # (_mdtbl['col2'] <= 10000)
 )
 
 mdtbl = _mdtbl[indx]
@@ -43,7 +42,7 @@ phasearr = np.unique(mdtbl['col1'])
 lamarr = np.unique(mdtbl['col2'])
 number_of_unique_phase, number_of_unique_wavelength = len(phasearr), len(lamarr)
 flux2darr = mdtbl['col3'].reshape(number_of_unique_phase, number_of_unique_wavelength)
-
+zarr = np.array([1e-3, 1e0])
 print(f"Table length: {len(_mdtbl)} --> {len(mdtbl)}")
 
 # %%
@@ -121,9 +120,9 @@ lamstep = bandwidth/10
 print(f"lam: {lammin:.3f} - {lammax:.3f} AA")
 print(f"lamstep: {lamstep:g} AA")
 print(f"n_lam: {len(lamarr)}")
-#%%
+
+# %%
 for inexptime in [60, 180, 300, 600, 900]:
-	# %%
 	if group == 'med25nm':
 		#	Medium-band
 		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
@@ -176,8 +175,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 	# %%
 	#	Temp Table
-	_intbl = Table.read(intablelist[0])
-	for key, val in _intbl.meta.items():
+	_mdtbl = Table.read(intablelist[0])
+	for key, val in _mdtbl.meta.items():
 		if key in ['MD', 'VD', 'MW', 'VW', 'ANG', 'PHASE', 'REDSHIFT',]:
 			if type(val) is str:
 				outbl[key] = ' '*10
@@ -187,12 +186,10 @@ for inexptime in [60, 180, 300, 600, 900]:
 				outbl[key] = 0
 
 	# %%
-	# def func(x, z, t, M_V, t_rise, dm15B, dm15R):
-	def func(x, z, t, Mejecta, Kinetic_energy, F_nickel):
+	def func(x, z, t, M_V, t_rise, dm15B, dm15R):
 
 		new_data = np.array(
-			# [[M_V, t_rise, dm15B, dm15R, t]]
-			[[Mejecta, Kinetic_energy, F_nickel, t]]
+			[[M_V, t_rise, dm15B, dm15R, t]]
 			)
 
 		#	Spectrum : wavelength & flux
@@ -207,11 +204,39 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 		return spfnu
 
+	def func_norm(x, nz, nt, nM_V, nt_rise, ndm15B, ndm15R):
+
+		M_V = denormalize(nM_V, infotbl['M_V'])
+		t_rise = denormalize(nt_rise, infotbl['t_rise'])
+		dm15B = denormalize(ndm15B, infotbl['dm15B'])
+		dm15R = denormalize(ndm15R, infotbl['dm15R'])
+		t = denormalize(nt, phasearr)
+		z = denormalize(nz, zarr)
+
+		new_data = np.array(
+			[[M_V, t_rise, dm15B, dm15R, t]]
+			)
+
+		#	Spectrum : wavelength & flux
+		flam = rf.predict(new_data)[0]
+
+		#	Redshifted
+		(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
+		mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
+
+		spmag = np.array([mags[key][0] for key in mags.keys()])
+		spfnu = (spmag*u.ABmag).to(u.uJy).value
+
+		return spfnu
+
+
 	# %%
-	ii = 10
+	# ii = 10
+	ii = 20
 	intable = intablelist[ii]
 	st = time.time()
-	#%%
+	# %%
+
 	for ii, intable in enumerate(intablelist):
 		# %%
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
@@ -244,49 +269,56 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 		# %%
 		if detection:
-			#	Initial Guess
-			p0list = [0.1, 5]
-			for key in param_keys:
-				p0list.append(np.mean(infotbl[key]))
-			p0 = tuple(p0list)
-			# print(p0)
-			# p0 = (
-			# 	0.01, 0, np.mean(infotbl['M_V']), np.mean(infotbl['t_rise']), np.mean(infotbl['dm15B']), np.mean(infotbl['dm15B']),
-			# )
-			#	Boundaries
-			loboundlist = [0.0, np.min(phasearr)]
-			upboundlist = [3.0, 30]
+			# #	Initial Guess
+			# p0list = [0.01, 0]
+			# for key in param_keys:
+			# 	p0list.append(np.mean(infotbl[key]))
+			# p0 = tuple(p0list)
 
+			# #	Boundaries
+			# loboundlist = [0.0, -25]
+			# upboundlist = [1.0, 30]
+
+			# for key in param_keys:
+			# 	loboundlist.append(np.min(infotbl[key]))
+			# 	upboundlist.append(np.max(infotbl[key]))
+
+			# bounds = (
+			# 	tuple(loboundlist),
+			# 	tuple(upboundlist),
+			# )
+
+			#	Normalization ver
+			#	Initial Guess
+			p0list = [normalize_minmax(0.01, zarr), normalize_minmax(5, phasearr)]
 			for key in param_keys:
-				loboundlist.append(np.min(infotbl[key]))
-				upboundlist.append(np.max(infotbl[key]))
+				p0list.append(normalize_minmax(np.mean(infotbl[key]), infotbl[key]))
+			p0 = tuple(p0list)
+
+			#	Boundaries
+			loboundlist = [0.0]*(2+len(param_keys))
+			upboundlist = [1.0]*(2+len(param_keys))
 
 			bounds = (
 				tuple(loboundlist),
 				tuple(upboundlist),
 			)
-			# print(bounds)
-			# bounds = (
-			# 	(0.0, -25, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
-			# 	(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
-			# )
-
 			n_free_param = len(inspect.signature(func).parameters)-1
 
 			# %%
 			fit = False
 			try:
 				popt, pcov = curve_fit(
-					func,
+					func_norm,
 					xdata=xdata,
 					ydata=ydata,
 					sigma=sigma,
-					# p0=p0,
+					p0=p0,
 					absolute_sigma=True,
 					check_finite=True,
 					bounds=bounds,
 					method='trf',
-					max_nfev=1e4,
+					# max_nfev=1e4,
 				)
 				fit = True
 			except Exception as e:
@@ -311,17 +343,19 @@ for inexptime in [60, 180, 300, 600, 900]:
 				perr = np.sqrt(np.diag(pcov))
 
 				# %%
-				z = popt[0]
-				t = popt[1]
-				Mejecta = popt[2]
-				Kinetic_energy = popt[3]
-				F_nickel = popt[4]
+				z = denormalize(popt[0], zarr)
+				t = denormalize(popt[1], phasearr)
+				M_V = denormalize(popt[2], infotbl['M_V'])
+				t_rise = denormalize(popt[3], infotbl['t_rise'])
+				dm15B = denormalize(popt[4], infotbl['dm15B'])
+				dm15R = denormalize(popt[5], infotbl['dm15R'])
 				if verbose:
 					print(f"z={z:.3}")
 					print(f"t={t:.3}")
-					print(f"Mejecta={Mejecta:.3}")
-					print(f"Kinetic_energy={Kinetic_energy:.3}")
-					print(f"F_nickel={F_nickel:.3}")
+					print(f"M_V={M_V:.3}")
+					print(f"t_rise={t_rise:.3}")
+					print(f"dm15B={dm15B:.3}")
+					print(f"dm15R={dm15R:.3}")
 
 				# %%
 				outpng = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'png')}"
@@ -336,16 +370,18 @@ for inexptime in [60, 180, 300, 600, 900]:
 				#	Fitted Parameters
 				outbl['z'][ii] = z
 				outbl['t'][ii] = t
-				outbl['Mejecta'][ii] = Mejecta
-				outbl['Kinetic_energy'][ii] = Kinetic_energy
-				outbl['F_nickel'][ii] = F_nickel
+				outbl['M_V'][ii] = M_V
+				outbl['t_rise'][ii] = t_rise
+				outbl['dm15B'][ii] = dm15B
+				outbl['dm15R'][ii] = dm15R
 
 				#	Error
 				outbl['zerr'][ii] = perr[0]
 				outbl['terr'][ii] = perr[1]
-				outbl['Mejectaerr'][ii] = perr[2]
-				outbl['Kinetic_energyerr'][ii] = perr[3]
-				outbl['F_nickelerr'][ii] = perr[4]
+				outbl['M_Verr'][ii] = perr[2]
+				outbl['t_riseerr'][ii] = perr[3]
+				outbl['dm15Berr'][ii] = perr[4]
+				outbl['dm15Rerr'][ii] = perr[5]
 
 				#	Fit Results
 				outbl['free_params'][ii] = n_free_param
@@ -356,7 +392,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 				# %%
 				new_data = np.array(
-					[[Mejecta, Kinetic_energy, F_nickel, t]]
+					[[M_V, t_rise, dm15B, dm15R, t]]
 					)
 
 				#	Spectrum : wavelength & flux
@@ -366,6 +402,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 				(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
 				mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
 
+
 				spmag = np.array([mags[key][0] for key in mags.keys()])
 				spfnu = (spmag*u.ABmag).to(u.uJy).value
 
@@ -373,9 +410,9 @@ for inexptime in [60, 180, 300, 600, 900]:
 				fnuarr = convert_flam2fnu(zspappflam, zsplam).to(u.uJy)
 
 				# %%
-				label = f"""n_det={ndet}, rchisq={chisqdof:.3}, bic={bic:.3}
+				label = f"""n_det={ndet}, rchisq={chisqdof:.3f}, bic={bic:.3f}
 				z ={z:.3f}, t ={t:.3f}
-				Mejecta={Mejecta:.3f}, t_rise={Kinetic_energy:.3f}, F_nickel={F_nickel:.3f}"""
+				M_V={M_V:.3f}, t_rise={t_rise:.3f}, dm15B={dm15B:.3f}, dm15R={dm15R:.3f}"""
 
 				# %%
 				plt.close('all')

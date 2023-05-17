@@ -41,7 +41,7 @@ arcsec2rad = 1/rad2arcsec
 lamunit = u.Angstrom
 flamunit = u.erg/u.second/u.cm**2/u.Angstrom
 #
-def func(x, a, b):
+def func_linear(x, a, b):
 	"""Function for making natural drop in a shorter wavelength of CMOS QE, optics transmission
 
 	Parameters
@@ -363,9 +363,9 @@ class SevenDT:
 		#	Curve-fit interpolation
 		lam_optics = T_qe['wavelength'].value
 		total_optics = T_qe['QE']
-		popt, pcov = curve_fit(func, lam_optics[:2], total_optics[:2])
+		popt, pcov = curve_fit(func_linear, lam_optics[:2], total_optics[:2])
 		xdata = np.arange(1000, 4000, 50)
-		ydata = func(xdata, *popt)
+		ydata = func_linear(xdata, *popt)
 		nx = np.append(xdata, lam_optics)
 		ny = np.append(ydata, total_optics)
 		ny[ny<0] = 0
@@ -411,9 +411,9 @@ class SevenDT:
 		#	Curve-fit interpolation
 		lam_optics = optbl['nm']*10
 		total_optics = optbl['total']
-		popt, pcov = curve_fit(func, lam_optics[:2], total_optics[:2])
+		popt, pcov = curve_fit(func_linear, lam_optics[:2], total_optics[:2])
 		xdata = np.arange(1000, 4000, 1)
-		ydata = func(xdata, *popt)
+		ydata = func_linear(xdata, *popt)
 		nx = np.append(xdata, lam_optics)
 		ny = np.append(ydata, total_optics)
 
