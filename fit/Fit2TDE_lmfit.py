@@ -19,7 +19,7 @@ from lmfit import Model
 snrcut = 3
 source = 'MOSFiT'
 fittype = 'TDE'
-verbose = True
+verbose = False
 
 # %%
 path_model = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}'
