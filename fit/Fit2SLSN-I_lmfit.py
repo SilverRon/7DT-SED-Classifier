@@ -11,21 +11,26 @@ from util.sdtpy import *
 import inspect
 import matplotlib.pyplot as plt
 from astropy.time import Time
+#
+from astropy.io import ascii
+from lmfit import Model
 
 # %%
 snrcut = 3
 source = 'MOSFiT'
-fittype = 'SNII-NMF'
+fittype = 'SLSN-I'
 verbose = True
 
 # %%
-models = sorted(glob.glob(f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/*.fits'))
+path_model = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}'
+models = sorted(glob.glob(f'{path_model}/*.fits'))
 print(f"{len(models)} models found") 
 
 # %%
-path_sedinfo = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/SED.INFO'
-infotbl = tablize_sedinfo(path_sedinfo, models)
-
+# path_sedinfo = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/SED.INFO'
+# infotbl = tablize_sedinfo(path_sedinfo, models)
+infotbl = ascii.read(f'../model/PLAsTiCC/{fittype}/sedinfo.dat')
+infotbl['model'] = [f"{path_model}/{model.replace('dat', 'dat.fits')}" for model in infotbl['model']]
 # %%
 ii = 10
 model = models[ii]
@@ -148,6 +153,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 	outbl['det_filters'] = " "*200
 	outbl['det'] = False
 	outbl['fit'] = False
+	outbl['fiterr'] = False
 	#	Fitted Parameters
 	outbl['z'] = 0.
 	outbl['t'] = 0.
@@ -165,6 +171,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 	outbl['chisq'] = 0.
 	outbl['chisqdof'] = 0.
 	outbl['bic'] = 0.
+	outbl['aic'] = 0.
+	outbl['rsq'] = 0.
 	#	Meta
 	outbl.meta['fittype'] = fittype
 	outbl.meta['source'] = source
@@ -187,16 +195,14 @@ for inexptime in [60, 180, 300, 600, 900]:
 				outbl[key] = 0
 
 	# %%
-	# def func(x, z, t, M_V, t_rise, dm15B, dm15R):
-	def func(x, z, t, pc1, pc2, pc3):
+	def func(x, z, t, bfield, mns, pspin, kappa, kappagamma, mej, temp, vej):
 
 		new_data = np.array(
-			# [[M_V, t_rise, dm15B, dm15R, t]]
-			[[pc1, pc2, pc3, t]]
+			[[bfield, mns, pspin, kappa, kappagamma, mej, temp, vej, t]]
 			)
 
 		#	Spectrum : wavelength & flux
-		flam = rf.predict(new_data)[0]
+		flam = rf.predict(new_data)[0]*8.358E-41
 
 		#	Redshifted
 		(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
@@ -204,15 +210,18 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 		spmag = np.array([mags[key][0] for key in mags.keys()])
 		spfnu = (spmag*u.ABmag).to(u.uJy).value
-
+		# print(f"z={z:.3f}, t={t:.3f}, bfield={bfield:.3f}, mns={mns:.3f}, pspin={pspin:.3f}, kappa={kappa:.3f}, kappagamma={kappagamma:.3f}, mej={mej:.3f}, temp={temp:.3f}, vej={vej:.3f}")
 		return spfnu
 
 	# %%
-	ii = 10
+	# ii = 10
+	# ii = 20
+	ii = 30
 	intable = intablelist[ii]
 	st = time.time()
 	#%%
-	for ii, intable in enumerate(intablelist):
+	# for ii, intable in enumerate(intablelist):
+	for ii, intable in enumerate(intablelist[:100]):
 		# %%
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
 		intbl = Table.read(intable)
@@ -244,50 +253,71 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 		# %%
 		if detection:
-			#	Initial Guess
-			p0list = [0.1, 5]
-			for key in param_keys:
-				p0list.append(np.mean(infotbl[key]))
-			p0 = tuple(p0list)
-			# print(p0)
-			# p0 = (
-			# 	0.01, 0, np.mean(infotbl['M_V']), np.mean(infotbl['t_rise']), np.mean(infotbl['dm15B']), np.mean(infotbl['dm15B']),
-			# )
-			#	Boundaries
-			loboundlist = [0.0, np.min(phasearr)]
-			upboundlist = [3.0, 30]
 
-			for key in param_keys:
-				loboundlist.append(np.min(infotbl[key]))
-				upboundlist.append(np.max(infotbl[key]))
-
-			bounds = (
-				tuple(loboundlist),
-				tuple(upboundlist),
-			)
-			# print(bounds)
-			# bounds = (
-			# 	(0.0, -25, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
-			# 	(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
-			# )
-
+			# 피팅에 사용할 데이터 생성
+			x = xdata
+			y = ydata
+			# lmfit 모델 생성
+			model = Model(func)
+			# 초기 파라미터 추정
+			params = model.make_params()
+			for key in params.keys():
+				if key == 'z':
+					init_val = 0.01
+					lower_val = 0.0001
+					upper_val = 1.0
+				elif key == 't':
+					init_val = np.median(phasearr)
+					lower_val = phasearr.min()
+					upper_val = phasearr.max()
+				else:
+					init_val = np.median(infotbl[key])
+					lower_val = np.min(infotbl[key])
+					upper_val = infotbl[key].max()
+				# print(key, init_val, lower_val, upper_val)
+				params[key].init_value = init_val
+				params[key].min = lower_val
+				params[key].max = upper_val
+			
 			n_free_param = len(inspect.signature(func).parameters)-1
 
-			# %%
+
 			fit = False
 			try:
-				popt, pcov = curve_fit(
-					func,
-					xdata=xdata,
-					ydata=ydata,
-					sigma=sigma,
-					# p0=p0,
-					absolute_sigma=True,
-					check_finite=True,
-					bounds=bounds,
-					method='trf',
-					max_nfev=1e4,
-				)
+				# 데이터 피팅
+				result = model.fit(
+					y,
+					params,
+					x=x,
+					weights=1/sigma,
+					calc_covar=True,
+					method='cobyla',
+					)
+
+
+				# 파라미터 에러 계산
+				if result.covar is not None:
+					perr = np.diag(result.covar)
+					fiterr = True
+				else:
+					perr = np.array([0.0]*n_free_param)
+					fiterr = False
+					pass
+				# param_errors = np.sqrt(np.diag(result.covar))
+
+				# 결과 출력
+				# print(result.fit_report())
+				# print("Chi-square:", chi_square)
+				# print("Degrees of Freedom:", dof)
+				# print("Reduced Chi-square:", reduced_chi_square)
+				# print("Parameter Errors:", param_errors)
+
+				# 피팅 결과 시각화
+				# plt.plot(x, y, 'bo', label='data')
+				# plt.errorbar(x, y, xerr=sigma, label='data')
+				# plt.plot(x, result.best_fit, 'r-', label='fit')
+				# plt.legend()
+
 				fit = True
 			except Exception as e:
 				# print(e)
@@ -298,54 +328,73 @@ for inexptime in [60, 180, 300, 600, 900]:
 				fit = False
 
 
-			# %%
+
 			if fit:
 				#	Fitting result
-				r = ydata.data - func(xdata, *popt)
-				n_free_param = len(inspect.signature(func).parameters)-1
-				dof = ndet - n_free_param
-				chisq_i = (r / sigma) ** 2
-				chisq = np.sum(chisq_i)
-				chisqdof = chisq/dof
-				bic = chisq + n_free_param*np.log(ndet)
-				perr = np.sqrt(np.diag(pcov))
+				# r = ydata.data - func(xdata, *popt)
+				# n_free_param = len(inspect.signature(func).parameters)-1
+				# dof = ndet - n_free_param
+				# chisq_i = (r / sigma) ** 2
+				# chisq = np.sum(chisq_i)
+				# chisqdof = chisq/dof
+				# bic = chisq + n_free_param*np.log(ndet)
+				# perr = np.sqrt(np.diag(pcov))
+				chisq = result.summary()['chisqr']
+				chisqdof = result.summary()['redchi']
+				dof = result.summary()['nfree']
+				bic = result.summary()['bic']
+				aic = result.summary()['aic']
+				rsq = result.summary()['rsquared']
 
-				# %%
-				z = popt[0]
-				t = popt[1]
-				pc1 = popt[2]
-				pc2 = popt[3]
-				pc3 = popt[4]
+				bestfit_values = [param.value for name, param in result.params.items()]
+				z, t, bfield, mns, pspin, kappa, kappagamma, mej, temp, vej = bestfit_values
 				if verbose:
+					print(f"ndet={ndet}")
+					print(f"chisq={chisq:.3}")
+					print(f"chisqdof={chisqdof:.3}")
+					print(f"bic={bic:.3}")
 					print(f"z={z:.3}")
 					print(f"t={t:.3}")
-					print(f"pc1={pc1:.3}")
-					print(f"pc2={pc2:.3}")
-					print(f"pc3={pc3:.3}")
+					print(f"bfield={bfield:.3}")
+					print(f"mns={mns:.3}")
+					print(f"pspin={pspin:.3}")
+					print(f"kappa={kappa:.3}")
+					print(f"kappagamma={kappagamma:.3}")
+					print(f"mej={mej:.3}")
+					print(f"temp={temp:.3}")
 
-				# %%
+
 				outpng = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'png')}"
 
 
-				# %%
+				#%%
 				#	Detection / Fit
 				outbl['ndet'][ii] = ndet
 				outbl['det_filters'][ii] = filterlist_str
 				outbl['det'][ii] = detection
 				outbl['fit'][ii] = fit
+				outbl['fiterr'][ii] = fiterr
 				#	Fitted Parameters
 				outbl['z'][ii] = z
 				outbl['t'][ii] = t
-				outbl['pc1'][ii] = pc1
-				outbl['pc2'][ii] = pc2
-				outbl['pc3'][ii] = pc3
+				outbl['bfield'][ii] = bfield
+				outbl['mns'][ii] = mns
+				outbl['pspin'][ii] = pspin
+				outbl['kappa'][ii] = kappa
+				outbl['kappagamma'][ii] = kappagamma
+				outbl['mej'][ii] = mej
+				outbl['temp'][ii] = temp
 
 				#	Error
 				outbl['zerr'][ii] = perr[0]
 				outbl['terr'][ii] = perr[1]
-				outbl['pc1err'][ii] = perr[2]
-				outbl['pc2err'][ii] = perr[3]
-				outbl['pc3err'][ii] = perr[4]
+				outbl['bfielderr'][ii] = perr[2]
+				outbl['mnserr'][ii] = perr[3]
+				outbl['pspinerr'][ii] = perr[4]
+				outbl['kappaerr'][ii] = perr[5]
+				outbl['kappagammaerr'][ii] = perr[6]
+				outbl['mejerr'][ii] = perr[7]
+				outbl['temperr'][ii] = perr[8]
 
 				#	Fit Results
 				outbl['free_params'][ii] = n_free_param
@@ -353,31 +402,31 @@ for inexptime in [60, 180, 300, 600, 900]:
 				outbl['chisq'][ii] = chisq
 				outbl['chisqdof'][ii] = chisqdof
 				outbl['bic'][ii] = bic
+				outbl['aic'][ii] = aic
+				outbl['rsq'][ii] = rsq
 
-				# %%
+
+				# t = 30
+				# bfield = 1
 				new_data = np.array(
-					[[pc1, pc2, pc3, t]]
+					[[bfield, mns, pspin, kappa, kappagamma, mej, temp, vej, t]]
 					)
 
 				#	Spectrum : wavelength & flux
-				flam = rf.predict(new_data)[0]
+				flam = rf.predict(new_data)[0]*8.358E-41
 
-				# %%
 				(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
 				mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
 
 				spmag = np.array([mags[key][0] for key in mags.keys()])
 				spfnu = (spmag*u.ABmag).to(u.uJy).value
 
-				# %%
 				fnuarr = convert_flam2fnu(zspappflam, zsplam).to(u.uJy)
 
-				# %%
 				label = f"""n_det={ndet}, rchisq={chisqdof:.3}, bic={bic:.3}
-				z ={z:.3f}, t ={t:.3f}
-				pc1={pc1:.3f}, t_rise={pc2:.3f}, pc3={pc3:.3f}"""
+				z ={z:.3f}, t ={t:.3f}, bfield={bfield:.3f}, mns={mns:.3f}, pspin={pspin:.3f},
+				kappa={kappa:.3f}, kappagamma={kappagamma:.3f}, mej={mej:.3f}, temp={temp:.3f}"""
 
-				# %%
 				plt.close('all')
 				plt.figure(figsize=(8, 6))
 				plt.plot(lamarr, fnuarr, c='grey', lw=3, alpha=0.5, label=label)

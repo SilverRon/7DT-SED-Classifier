@@ -1,100 +1,36 @@
+# %% [markdown]
+# # Library
+
 # %%
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-import numpy as np
-import glob
 from astropy.table import Table
+import numpy as np
+import matplotlib.pyplot as plt
+from astropy.time import Time
+
+# from astropy.cosmology import WMAP9 as cosmo
+# from astropy.constants import c
+# from astropy import units as u
+# from astropy.cosmology import z_at_value
+import inspect
+
 import sys
 sys.path.append('..')
 from util.helper import *
 from util.sdtpy import *
-import inspect
-import matplotlib.pyplot as plt
-from astropy.time import Time
-
-# %%
-snrcut = 3
-source = 'MOSFiT'
-fittype = 'SNIax'
-verbose = True
-
-# %%
-models = sorted(glob.glob(f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/*.fits'))
-print(f"{len(models)} models found") 
-
-# %%
-path_sedinfo = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}/SED.INFO'
-infotbl = tablize_sedinfo(path_sedinfo, models)
-
-# %%
-ii = 10
-model = models[ii]
-_mdtbl = Table.read(model)
-
-indx = np.where(
-    (_mdtbl['col1'] <= 30) &
-    (_mdtbl['col2'] >= 2000) &
-    (_mdtbl['col2'] <= 11000)
-)
-
-mdtbl = _mdtbl[indx]
-phasearr = np.unique(mdtbl['col1'])
-lamarr = np.unique(mdtbl['col2'])
-number_of_unique_phase, number_of_unique_wavelength = len(phasearr), len(lamarr)
-flux2darr = mdtbl['col3'].reshape(number_of_unique_phase, number_of_unique_wavelength)
-
-print(f"Table length: {len(_mdtbl)} --> {len(mdtbl)}")
-
-# %%
-param_keys = infotbl.keys()[2:]
-param_keys
-
-# %%
-# 데이터 변환
-X, y = prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase, number_of_unique_wavelength, phase_upper=np.max(phasearr), lam_lower=np.min(lamarr), lam_upper=np.max(lamarr))
-# 데이터 분할
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# %%
-# Random Forest 모델 생성 및 훈련
-rf = RandomForestRegressor()
-rf.fit(X_train, y_train)
-
-# %%
-
-"""
-# 테스트 데이터에 대한 예측 수행
-y_pred = rf.predict(X_test)
-
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-
-# 평균 제곱 오차 (MSE) 계산
-mse = mean_squared_error(y_test, y_pred)
-print("평균 제곱 오차 (MSE):", mse)
-
-# 평균 절대 오차 (MAE) 계산
-mae = mean_absolute_error(y_test, y_pred)
-print("평균 절대 오차 (MAE):", mae)
-
-# 결정 계수 (R-squared) 계산
-r2 = r2_score(y_test, y_pred)
-print("결정 계수 (R-squared):", r2)
-"""
-# %% [markdown]
-# # Fitting the model
-
-# %% [markdown]
-# ## Input data
-
-# %%
 register_custom_filters_on_speclite('../util')
+
+# %% [markdown]
+# # Setting
+
+# %% [markdown]
+# - Define `speclite` object
 
 # %%
 intype = 'kn'
 indist = 40
 inexptime = 180
-# group = 'broad_ugriz'
 group = input("""Choose the filterset (med25nm, broad_griz, broad_ugriz):""")
+# group = 'broad_ugriz'
 if group == 'med25nm':
 	filterset_group = filterlist_med25nm
 elif group == 'broad_griz':
@@ -104,6 +40,19 @@ elif group == 'broad_ugriz':
 filterset = [f"{group}-{filte}" for filte, _, group in filterset_group]
 bands = speclite.filters.load_filters(*filterset)
 
+# %% [markdown]
+# ## Kilonova
+# - GW170817-like morphology model
+
+# %%
+import pickle
+path_pickle = '../model/PLAsTiCC/SNII-NMF/SNII.pickle'
+with open(path_pickle, 'rb') as f:
+	interp = pickle.load(f)
+# interp = interp_gw170817like_kn(path_kntable='/Users/paek/Research/7DT/7dtpy/3.table/kn_sim_cube_lite', path_pickle=None)
+# lamarr = np.arange(1003, 127695.+1, 1)
+
+# %%
 if 'med' in bands.names[0]:
 	#    Medium-band
 	bandwidth = 250 # [AA]
@@ -115,16 +64,92 @@ else:
 	lammin = 2000
 	lammax = 12000
 
+# lammin = bands.effective_wavelengths.min().value-bandwidth*2
+# lammax = bands.effective_wavelengths.max().value+bandwidth*2
+
 lamstep = bandwidth/10
-# lamarr = np.arange(lammin, lammax+lamstep, lamstep)
-# _lamarr = np.arange(lammin, lammax+lamstep, 10)
+lamarr = np.arange(lammin, lammax+lamstep, lamstep)
+_lamarr = np.arange(lammin, lammax+lamstep, 10)
 
 print(f"lam: {lammin:.3f} - {lammax:.3f} AA")
 print(f"lamstep: {lamstep:g} AA")
 print(f"n_lam: {len(lamarr)}")
 
+#	Redshift
+zarr = np.array([1e-4, 1e-3, 1e-2, 1e-1, 1e0])
+
+# %% [markdown]
+# - Function to fit
 # %%
+def func(x, z, t, pc1, pc2, pc3):
+
+	z0 = 0
+	#	Input
+	point = (
+		pc1,
+		pc2,
+		pc3,
+		t,
+		lamarr,
+	)
+
+	iflux = interp(point)
+	(zspappflam, zsplam) = apply_redshift_on_spectrum(iflux*flamunit, lamarr*lamunit, z, z0)
+	mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
+
+	spmag = np.array([mags[key][0] for key in mags.keys()])
+	spfnu = (spmag*u.ABmag).to(u.uJy).value
+
+	return spfnu
+
+# %% [markdown]
+# ## Variables to set
+
+# %%
+# %%
+snrcut = 3
+source = 'MOSFiT'
+fittype = 'SNII-NMF'
+verbose = True
+
+path_model = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}'
+models = sorted(glob.glob(f'{path_model}/*.fits'))
+print(f"{len(models)} models found") 
+
+infotbl = ascii.read(f'../model/PLAsTiCC/{fittype}/sedinfo.dat')
+infotbl['model'] = [f"{path_model}/{model}" for model in infotbl['model']] 
+
+
+ii = 10
+model = models[ii]
+_mdtbl = Table.read(model)
+
+indx = np.where(
+    (_mdtbl['col1'] <= 30) &
+    (_mdtbl['col2'] >= 2000) &
+    (_mdtbl['col2'] <= 11000)
+    # (_mdtbl['col2'] <= 10000)
+)
+
+mdtbl = _mdtbl[indx]
+phasearr = np.unique(mdtbl['col1'])
+lamarr = np.unique(mdtbl['col2'])
+number_of_unique_phase, number_of_unique_wavelength = len(phasearr), len(lamarr)
+flux2darr = mdtbl['col3'].reshape(number_of_unique_phase, number_of_unique_wavelength)
+
+print(f"Table length: {len(_mdtbl)} --> {len(mdtbl)}")
+
+
+param_keys = infotbl.keys()[2:]
+param_keys
+# %% [markdown]
+# ## Input Tables
+# for inexptime in [60, 180, 300, 600, 900]:
+# for inexptime in [900]:
 for inexptime in [60, 180, 300, 600, 900]:
+
+
+	# %%
 	if group == 'med25nm':
 		#	Medium-band
 		path_input = f'../input/{intype}/{indist:0>3}Mpc/{inexptime:0>3}s/{group}'
@@ -186,39 +211,20 @@ for inexptime in [60, 180, 300, 600, 900]:
 				outbl[key] = 0.0
 			elif type(val) is int:
 				outbl[key] = 0
+			# print(key, val)
 
-	# %%
-	def func(x, z, t, M_V, t_rise, dm15B, dm15R):
 
-		new_data = np.array(
-			[[M_V, t_rise, dm15B, dm15R, t]]
-			)
-
-		#	Spectrum : wavelength & flux
-		flam = rf.predict(new_data)[0]
-
-		#	Redshifted
-		(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
-		mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
-
-		spmag = np.array([mags[key][0] for key in mags.keys()])
-		spfnu = (spmag*u.ABmag).to(u.uJy).value
-
-		return spfnu
-
-	# %%
-	# ii = 10
-	# ii = 20
-	# ii = 30
-	# ii = 40
+	ii = 10
 	intable = intablelist[ii]
 	st = time.time()
-
 	# %%
-	for ii, intable in enumerate(intablelist[:10]):
-		# %%
+	for ii, intable in enumerate(intablelist):
+		#%%
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
 		intbl = Table.read(intable)
+
+		# %% [markdown]
+		# - Detection
 
 		# %%
 		indx_det = np.where(intbl['snr']>snrcut)
@@ -230,53 +236,33 @@ for inexptime in [60, 180, 300, 600, 900]:
 		bands = speclite.filters.load_filters(*filterset)
 
 		# %%
-		# %%
 		ndet = len(filterset)
 		detection = np.any(intbl['snr'] > 5)
 		if verbose:
 			print(f"number of detections: {ndet}")
 			print(f"detection: {detection}")
 
-		# %%
-		xdata = intbl['fnuobs'].data[indx_det]
-		ydata = xdata
-		sigma = intbl['fnuerr'].data[indx_det]
-
-		# %% [markdown]
-		# - x, z, t, M_V, t_rise, dm15B, dm15R
 
 		# %%
 		if detection:
-			#	Initial Guess
-			p0list = [0.01, 0]
-			for key in param_keys:
-				p0list.append(np.mean(infotbl[key]))
-			p0 = tuple(p0list)
-			# print(p0)
-			# p0 = (
-			# 	0.01, 0, np.mean(infotbl['M_V']), np.mean(infotbl['t_rise']), np.mean(infotbl['dm15B']), np.mean(infotbl['dm15B']),
-			# )
-			#	Boundaries
-			loboundlist = [0.0, -25]
-			upboundlist = [1.0, 30]
+			xdata = intbl['fnuobs'].data[indx_det]
+			ydata = xdata
+			sigma = intbl['fnuerr'].data[indx_det]
 
-			for key in param_keys:
-				loboundlist.append(np.min(infotbl[key]))
-				upboundlist.append(np.max(infotbl[key]))
+			p0 = (
+				0.01, np.median(phasearr), np.median(infotbl['pc1']), np.median(infotbl['pc2']), np.median(infotbl['pc3'])
+			)
 
 			bounds = (
-				tuple(loboundlist),
-				tuple(upboundlist),
+				(np.min(zarr), np.min(phasearr), np.min(infotbl['pc1']), np.min(infotbl['pc2']), np.min(infotbl['pc3'])),
+				(np.max(zarr), np.max(phasearr), np.max(infotbl['pc1']), np.max(infotbl['pc2']), np.max(infotbl['pc3']))
 			)
-			# print(bounds)
-			# bounds = (
-			# 	(0.0, -25, np.min(infotbl['M_V']), np.min(infotbl['t_rise']), np.min(infotbl['dm15B']), np.min(infotbl['dm15R'])),
-			# 	(1.0, 30,      np.max(infotbl['M_V']), np.max(infotbl['t_rise']), np.max(infotbl['dm15B']), np.max(infotbl['dm15R'])),
-			# )
 
+			# %%
 			n_free_param = len(inspect.signature(func).parameters)-1
 
 			# %%
+			#	Default `fit`
 			fit = False
 			try:
 				popt, pcov = curve_fit(
@@ -284,15 +270,11 @@ for inexptime in [60, 180, 300, 600, 900]:
 					xdata=xdata,
 					ydata=ydata,
 					sigma=sigma,
-					# p0=p0,
+					p0=p0,
 					absolute_sigma=True,
 					check_finite=True,
 					bounds=bounds,
 					method='trf',
-					# diff_step=0.2,
-					diff_step=0.2,
-					# diff_step=0.2,
-					
 					# max_nfev=1e4,
 				)
 				fit = True
@@ -304,8 +286,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 				f.close()
 				fit = False
 
-
-
+			# %%
 			if fit:
 				#	Fitting result
 				r = ydata.data - func(xdata, *popt)
@@ -317,46 +298,29 @@ for inexptime in [60, 180, 300, 600, 900]:
 				bic = chisq + n_free_param*np.log(ndet)
 				perr = np.sqrt(np.diag(pcov))
 
+				# %%
+				z, t, pc1, pc2, pc3 = popt
 
-				z = popt[0]
-				t = popt[1]
-				M_V = popt[2]
-				t_rise = popt[3]
-				dm15B = popt[4]
-				dm15R = popt[5]
 				if verbose:
-					print(f"z={z:.3}")
-					print(f"t={t:.3}")
-					print(f"M_V={M_V:.3}")
-					print(f"t_rise={t_rise:.3}")
-					print(f"dm15B={dm15B:.3}")
-					print(f"dm15R={dm15R:.3}")
-
-
+					for param, val in zip(param_keys, popt):
+						print(f"{param}: {val:.3f}")
+				# %%
 				outpng = f"{path_output}/{os.path.basename(intable).replace('obs', 'fit').replace('fits', 'png')}"
 
 
+				# %%
+				parameters = ['z', 't']+param_keys
 				#	Detection / Fit
 				outbl['ndet'][ii] = ndet
 				outbl['det_filters'][ii] = filterlist_str
 				outbl['det'][ii] = detection
 				outbl['fit'][ii] = fit
 				#	Fitted Parameters
-				outbl['z'][ii] = z
-				outbl['t'][ii] = t
-				outbl['M_V'][ii] = M_V
-				outbl['t_rise'][ii] = t_rise
-				outbl['dm15B'][ii] = dm15B
-				outbl['dm15R'][ii] = dm15R
-
-				#	Error
-				outbl['zerr'][ii] = perr[0]
-				outbl['terr'][ii] = perr[1]
-				outbl['M_Verr'][ii] = perr[2]
-				outbl['t_riseerr'][ii] = perr[3]
-				outbl['dm15Berr'][ii] = perr[4]
-				outbl['dm15Rerr'][ii] = perr[5]
-
+				for key, val, valerr in zip(parameters, popt, perr):
+					#	Value
+					outbl[key][ii] = val
+					#	Error
+					outbl[f"{key}err"][ii] = valerr
 				#	Fit Results
 				outbl['free_params'][ii] = n_free_param
 				outbl['dof'][ii] = dof
@@ -364,29 +328,48 @@ for inexptime in [60, 180, 300, 600, 900]:
 				outbl['chisqdof'][ii] = chisqdof
 				outbl['bic'][ii] = bic
 
-				new_data = np.array(
-					[[M_V, t_rise, dm15B, dm15R, t]]
-					)
 
-				#	Spectrum : wavelength & flux
-				flam = rf.predict(new_data)[0]
+				# %%
+				#	Temp Table
+				for key, val in intbl.meta.items():
+					if key in ['MD', 'VD', 'MW', 'VW', 'ANG', 'PHASE', 'REDSHIFT',]:
+						outbl[key][ii] = val
 
-				(zspappflam, zsplam) = apply_redshift_on_spectrum(flam*flamunit, lamarr*lamunit, z, z0=0)
-				mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
+				# %% [markdown]
+				# # Plot
 
+				# %%
+				z0 = 0
+
+				point = (
+					pc1,
+					pc2,
+					pc3,
+					t,
+					_lamarr,
+				)
+
+				iflux = interp(point)
+				(zspappflam, zsplam) = apply_redshift_on_spectrum(iflux*flamunit, _lamarr*lamunit, z, z0)
+				mags = bands.get_ab_magnitudes(zspappflam, zsplam)
 
 				spmag = np.array([mags[key][0] for key in mags.keys()])
 				spfnu = (spmag*u.ABmag).to(u.uJy).value
 
+				# %%
 				fnuarr = convert_flam2fnu(zspappflam, zsplam).to(u.uJy)
 
-				label = f"""n_det={ndet}, rchisq={chisqdof:.3f}, bic={bic:.3f}
-				z ={z:.3f}, t ={t:.3f}
-				M_V={M_V:.3f}, t_rise={t_rise:.3f}, dm15B={dm15B:.3f}, dm15R={dm15R:.3f}"""
-
+				# %%
+				label = f"""n_det={ndet}, rchisq={chisqdof:.3}, bic={bic:.3}
+				"""
+				for kk, (key, val, valerr) in enumerate(zip(parameters, popt, perr)):
+					if (kk == 6) or (kk == 12):
+						label += '\n'
+					label += f"{key}={val:.3}, "
+				# %%
 				plt.close('all')
 				plt.figure(figsize=(8, 6))
-				plt.plot(lamarr, fnuarr, c='grey', lw=3, alpha=0.5, label=label)
+				plt.plot(_lamarr, fnuarr, c='grey', lw=3, alpha=0.5, label=label)
 				yl, yu = plt.ylim()
 				# plt.scatter(bands.effective_wavelengths, xdata, c=intbl['snr'], marker='s', s=50, ec='k')
 				plt.scatter(intbl['lam'], intbl['fnuobs'], c=intbl['snr'], marker='s', s=50, ec='k')
@@ -422,7 +405,3 @@ delt = ed-st
 outbl.meta['time[s]'] = delt
 outbl.write(outfits, overwrite=True)
 print(f"Done ({delt:.3}s)")
-
-
-
-# %%

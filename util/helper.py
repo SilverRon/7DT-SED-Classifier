@@ -605,20 +605,11 @@ def prepare_rf_train_data(infotbl, param_keys, phasearr, number_of_unique_phase,
 		_mdtbl = Table.read(model)
 
 		indx = np.where(
-			# (_mdtbl['col1'] <= 30) &
-			# (_mdtbl['col2'] >= 2000) &
-			# (_mdtbl['col2'] <= 10000)
 			(_mdtbl['col1'] <= phase_upper) &
 			(_mdtbl['col2'] >= lam_lower) &
 			(_mdtbl['col2'] <= lam_upper)
 		)
 		mdtbl = _mdtbl[indx]
-
-		# param1 = infotbl['M_V'][mm]
-		# param2 = infotbl['t_rise'][mm]
-		# param3 = infotbl['dm15B'][mm]
-		# param4 = infotbl['dm15R'][mm]
-		# param5 = infotbl['phase'][mm]
 
 		param_values = []
 		for key in param_keys:
