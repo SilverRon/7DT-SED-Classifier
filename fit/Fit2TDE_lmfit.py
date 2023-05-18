@@ -220,8 +220,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 	intable = intablelist[ii]
 	st = time.time()
 	#%%
-	# for ii, intable in enumerate(intablelist):
-	for ii, intable in enumerate(intablelist[:100]):
+	# for ii, intable in enumerate(intablelist[:100]):
+	for ii, intable in enumerate(intablelist):
 		# %%
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
 		intbl = Table.read(intable)
