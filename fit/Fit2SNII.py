@@ -62,7 +62,7 @@ else:
 	#	Broad-band
 	bandwidth = 1000 # [AA]
 	lammin = 2000
-	lammax = 11000
+	lammax = 10000
 
 # lammin = bands.effective_wavelengths.min().value-bandwidth*2
 # lammax = bands.effective_wavelengths.max().value+bandwidth*2
