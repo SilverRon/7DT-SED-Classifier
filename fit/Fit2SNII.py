@@ -61,8 +61,8 @@ if 'med' in bands.names[0]:
 else:
 	#	Broad-band
 	bandwidth = 1000 # [AA]
-	lammin = 3000
-	lammax = 12000
+	lammin = 2000
+	lammax = 11000
 
 # lammin = bands.effective_wavelengths.min().value-bandwidth*2
 # lammax = bands.effective_wavelengths.max().value+bandwidth*2
