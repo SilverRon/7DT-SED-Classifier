@@ -697,7 +697,7 @@ filterlist_ugriz = (
 )
 
 # http://svo2.cab.inta-csic.es/svo/theory/fps/index.php?mode=browse&gname=SLOAN&asttype=
-bandwidtharr_broad = np.array([
+bandwidtharr_broad_ugriz = np.array([
 	#	ugriz
 	540.97,
 	1064.68,
@@ -711,3 +711,11 @@ bandwidtharr_broad = np.array([
 	# 1478.93,
 	# 4306.72,
 ])
+bandwidtharr_broad_griz = np.array([
+	#	griz
+	1064.68,
+	1055.51,
+	1102.57,
+	1164.01,
+])
+bandwidtharr_med25nm = np.array([250]*20)
