@@ -20,6 +20,7 @@ snrcut = 3
 source = 'MOSFiT'
 fittype = 'SNIbc'
 verbose = False
+fitmethod = 'cobyla'
 
 # %%
 path_model = f'../model/PLAsTiCC/{fittype}/SIMSED.{fittype}'
@@ -311,7 +312,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 					method=fitmethod,
 					)
 
-
+				fiterr = False
 				# 파라미터 에러 계산
 				if result.covar is not None:
 					perr = np.diag(result.covar)
