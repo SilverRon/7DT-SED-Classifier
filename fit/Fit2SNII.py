@@ -351,7 +351,7 @@ for inexptime in [60, 180, 300, 600, 900]:
 
 				iflux = interp(point)
 				(zspappflam, zsplam) = apply_redshift_on_spectrum(iflux*flamunit, _lamarr*lamunit, z, z0)
-				mags = bands.get_ab_magnitudes(zspappflam, zsplam)
+				mags = bands.get_ab_magnitudes(*bands.pad_spectrum(zspappflam, zsplam))
 
 				spmag = np.array([mags[key][0] for key in mags.keys()])
 				spfnu = (spmag*u.ABmag).to(u.uJy).value
