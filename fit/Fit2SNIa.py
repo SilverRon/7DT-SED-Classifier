@@ -333,13 +333,13 @@ for inexptime in [60, 180, 300, 600, 900]:
 				yl, yu = plt.ylim()
 				# plt.scatter(bands.effective_wavelengths, xdata, c=intbl['snr'], marker='s', s=50, ec='k')
 				plt.scatter(intbl['lam'], intbl['fnuobs'], c=intbl['snr'], marker='s', s=50, ec='k')
-				# plt.errorbar(intbl['lam'], intbl['fnuobs'], yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
 				if 'med' in group:
-					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidth/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
-				elif 'broad' in group:
-					# plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad[indx_det]/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
-					plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr_broad/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)					
-				cbar = plt.colorbar()
+					bandwidtharr = bandwidtharr_med25nm
+				elif group == 'broad_ugriz':
+					bandwidtharr = bandwidtharr_broad_ugriz
+				elif group == 'broad_griz':
+					bandwidtharr = bandwidtharr_broad_griz
+				plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)									cbar = plt.colorbar()
 				cbar.set_label("SNR")
 				# plt.plot(bands.effective_wavelengths, func(xdata, *popt), '.', c='tomato')
 				plt.plot(intbl['lam'], intbl['fnu'], c='tomato', marker='.', ls='none', zorder=0)
