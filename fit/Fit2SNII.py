@@ -219,9 +219,27 @@ for inexptime in [60, 180, 300, 600, 900]:
 	st = time.time()
 	# %%
 	for ii, intable in enumerate(intablelist):
-		#%%
+		# %%
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
 		intbl = Table.read(intable)
+
+		if group == 'broad_ugriz':
+			indx_filter = np.where(
+				(intbl['filter']=='u') |
+				(intbl['filter']=='g') |
+				(intbl['filter']=='r') |
+				(intbl['filter']=='i') |
+				(intbl['filter']=='z')
+			)
+			intbl = intbl[indx_filter]
+		elif group == 'broad_griz':
+			indx_filter = np.where(
+				(intbl['filter']=='g') |
+				(intbl['filter']=='r') |
+				(intbl['filter']=='i') |
+				(intbl['filter']=='z')
+			)
+			intbl = intbl[indx_filter]
 
 		# %% [markdown]
 		# - Detection

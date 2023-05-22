@@ -174,10 +174,26 @@ for inexptime in [60, 180, 300, 600, 900]:
 	#%%
 	for ii, intable in enumerate(intablelist):
 		# %%
-		# print(f"[{ii:0>6}/{os.path.basename(intable)}]")
 		print(f"{os.path.basename(intable)} ({inexptime}s) --> {fittype}")
-		# intable = intablelist[ii]
-		intbl = Table.read(intable, format='fits')
+		intbl = Table.read(intable)
+
+		if group == 'broad_ugriz':
+			indx_filter = np.where(
+				(intbl['filter']=='u') |
+				(intbl['filter']=='g') |
+				(intbl['filter']=='r') |
+				(intbl['filter']=='i') |
+				(intbl['filter']=='z')
+			)
+			intbl = intbl[indx_filter]
+		elif group == 'broad_griz':
+			indx_filter = np.where(
+				(intbl['filter']=='g') |
+				(intbl['filter']=='r') |
+				(intbl['filter']=='i') |
+				(intbl['filter']=='z')
+			)
+			intbl = intbl[indx_filter]
 
 		# %%
 		indx_det = np.where(intbl['snr']>snrcut)
