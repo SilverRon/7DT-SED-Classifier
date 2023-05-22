@@ -464,11 +464,11 @@ for inexptime in [60, 180, 300, 600, 900]:
 				plt.tight_layout()
 				plt.savefig(outpng, dpi=100)
 
-# %%
-ed = time.time()
-delt = ed-st
-outbl.meta['time[s]'] = delt
-outbl.write(outfits, overwrite=True)
-print(f"Done ({delt:.3}s)")
+	# %%
+	ed = time.time()
+	delt = ed-st
+	outbl.meta['time[s]'] = delt
+	outbl.write(outfits, overwrite=True)
+	print(f"Done ({delt:.3}s)")
 
 
