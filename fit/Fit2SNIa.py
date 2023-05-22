@@ -339,7 +339,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 					bandwidtharr = bandwidtharr_broad_ugriz
 				elif group == 'broad_griz':
 					bandwidtharr = bandwidtharr_broad_griz
-				plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)									cbar = plt.colorbar()
+				plt.errorbar(intbl['lam'], intbl['fnuobs'], xerr=bandwidtharr/2, yerr=intbl['fnuerr'], c='k', ls='none', zorder=0)
+				cbar = plt.colorbar()
 				cbar.set_label("SNR")
 				# plt.plot(bands.effective_wavelengths, func(xdata, *popt), '.', c='tomato')
 				plt.plot(intbl['lam'], intbl['fnu'], c='tomato', marker='.', ls='none', zorder=0)
