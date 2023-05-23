@@ -164,3 +164,5 @@ model/gw170817-like.interp.pkl
 input/*
 fit_result/*
 etc/*
+fit_result.zip
+fit_result2/*
