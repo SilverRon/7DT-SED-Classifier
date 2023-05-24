@@ -407,15 +407,27 @@ for inexptime in [60, 180, 300, 600, 900]:
 			# )
 			# %%
 			#	Rough guess & boundaries
+			# p0 = (
+			# 	# inmd, invd, inmw, invw, inang, inphase, inz,
+			# 	mdarr.mean(), vdarr.mean(), mwarr.mean(), vwarr.mean(), angarr.mean(), inphase, inz,
+			# )
+			# bounds = (
+			# 	#   min-max boundary
+			# 	#   answer boundary
+			# 	(mdarr.min(), vdarr.min(), mwarr.min(), vwarr.min(), angarr.min(), phaselo, inz*0.9),
+			# 	(mdarr.max(), vdarr.max(), mwarr.max(), vwarr.max(), angarr.max(), phaseup, inz*1.1)
+			# )
+			# %%
+			#	Custom guess & boundaries for measuring the viewing angle
 			p0 = (
-				# inmd, invd, inmw, invw, inang, inphase, inz,
-				mdarr.mean(), vdarr.mean(), mwarr.mean(), vwarr.mean(), angarr.mean(), inphase, inz,
+				# mdarr.mean(), vdarr.mean(), mwarr.mean(), vwarr.mean(), angarr.mean(), inphase, inz,
+				inmd, invd, inmw, invw, angarr.mean(), inphase, inz,
 			)
 			bounds = (
 				#   min-max boundary
 				#   answer boundary
-				(mdarr.min(), vdarr.min(), mwarr.min(), vwarr.min(), angarr.min(), phaselo, inz*0.9),
-				(mdarr.max(), vdarr.max(), mwarr.max(), vwarr.max(), angarr.max(), phaseup, inz*1.1)
+				(mdlo, vdlo, mwlo, vwlo, angarr.min(), phaselo, inz*0.9),
+				(mdup, vdup, mwup, vwup, angarr.max(), phaseup, inz*1.1)
 			)
 
 			# %%
