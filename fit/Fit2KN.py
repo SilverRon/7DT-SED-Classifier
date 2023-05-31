@@ -422,13 +422,15 @@ for inexptime in [60, 180, 300, 600, 900]:
 			p0 = (
 				# mdarr.mean(), vdarr.mean(), mwarr.mean(), vwarr.mean(), angarr.mean(), inphase, inz,
 				# inmd, invd, inmw, invw, angarr.mean(), inphase, inz,
-				inmd, invd, inmw, invw, None, inphase, inz,
+				inmd, invd, inmw, invw, 45., inphase, inz,
 			)
 			bounds = (
 				#   min-max boundary
 				#   answer boundary
-				(mdlo, vdlo, mwlo, vwlo, angarr.min(), phaselo, inz*0.9),
-				(mdup, vdup, mwup, vwup, angarr.max(), phaseup, inz*1.1)
+				# (mdlo, vdlo, mwlo, vwlo, angarr.min(), phaselo, inz*0.9),
+				# (mdup, vdup, mwup, vwup, angarr.max(), phaseup, inz*1.1)
+				(mdlo, vdlo, mwlo, vwlo, 0., phaselo, inz*0.9),
+				(mdup, vdup, mwup, vwup, 90., phaseup, inz*1.1)
 			)
 
 			# %%
