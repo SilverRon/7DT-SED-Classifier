@@ -421,7 +421,8 @@ for inexptime in [60, 180, 300, 600, 900]:
 			#	Custom guess & boundaries for measuring the viewing angle
 			p0 = (
 				# mdarr.mean(), vdarr.mean(), mwarr.mean(), vwarr.mean(), angarr.mean(), inphase, inz,
-				inmd, invd, inmw, invw, angarr.mean(), inphase, inz,
+				# inmd, invd, inmw, invw, angarr.mean(), inphase, inz,
+				inmd, invd, inmw, invw, None, inphase, inz,
 			)
 			bounds = (
 				#   min-max boundary
